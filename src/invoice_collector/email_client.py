@@ -38,7 +38,20 @@ class IMAPClient:
             self._conn.login(self.username, self.password)
         except imaplib.IMAP4.error as e:
             raise RuntimeError(f"IMAP认证失败: {e}") from e
-        self._conn.select("INBOX")
+
+    def _list_all_folders(self) -> list[str]:
+        """列出所有可访问的邮件文件夹"""
+        _, folders = self._conn.list()
+        result = []
+        for item in folders:
+            if not isinstance(item, bytes):
+                continue
+            folder_str = item.decode("utf-8", errors="replace")
+            parts = folder_str.split('" ')
+            if len(parts) >= 2:
+                fname = parts[-1].strip().strip('"')
+                result.append(fname)
+        return result
 
     def disconnect(self):
         if self._conn:
@@ -48,51 +61,66 @@ class IMAPClient:
                 pass
             self._conn = None
 
-    def search_invoice_uids(self, since: datetime | None = None) -> list[str]:
-        """搜索发票相关邮件UID列表"""
+    def search_invoice_uids(self, since: datetime | None = None) -> list[tuple[str, str]]:
+        """
+        搜索所有文件夹中的邮件，返回 [(folder, uid), ...] 列表。
+        各文件夹UID独立，用(folder, uid)作为唯一标识。
+        """
         if since is None:
             since = datetime.now() - timedelta(days=self.lookback_days)
 
-        since_str = since.strftime("%d-%b-%Y")  # e.g. 01-Jan-2025
+        since_str = since.strftime("%d-%b-%Y")
+        criteria = f'(SINCE "{since_str}")'
 
-        all_uids: set[str] = set()
-        for keyword in self.keywords:
-            # IMAP SEARCH不支持中文主题直接搜索，改用SINCE过滤后本地匹配
-            # 先按SINCE获取所有邮件UID
-            criteria = f'(SINCE "{since_str}")'
-            _, data = self._conn.uid("search", None, criteria)
-            if data and data[0]:
-                uids = data[0].decode().split()
-                all_uids.update(uids)
+        results: list[tuple[str, str]] = []
+        folders = self._list_all_folders()
 
-        return list(all_uids)
+        for folder in folders:
+            try:
+                ret, _ = self._conn.select(folder, readonly=True)
+                if ret != "OK":
+                    continue
+                _, data = self._conn.uid("search", None, criteria)
+                if data and data[0]:
+                    for uid in data[0].decode().split():
+                        results.append((folder, uid))
+            except Exception:
+                continue
 
-    def fetch_message(self, uid: str) -> email.message.Message | None:
-        """获取单封邮件"""
-        _, data = self._conn.uid("fetch", uid, "(RFC822)")
-        if not data or not data[0]:
+        return results
+
+    def fetch_message(self, folder: str, uid: str) -> email.message.Message | None:
+        """切换到指定文件夹并获取单封邮件"""
+        try:
+            self._conn.select(folder, readonly=True)
+            _, data = self._conn.uid("fetch", uid, "(RFC822)")
+            if not data or not data[0]:
+                return None
+            raw = data[0][1]
+            return email.message_from_bytes(raw)
+        except Exception:
             return None
-        raw = data[0][1]
-        return email.message_from_bytes(raw)
 
     def iter_invoice_messages(
         self, since: datetime | None = None, known_uids: set[str] | None = None
     ) -> Generator[tuple[str, email.message.Message, str], None, None]:
         """
-        迭代发票邮件，返回 (uid, message, subject) 三元组。
-        known_uids: 已处理的UID集合，跳过。
+        迭代发票邮件，返回 (folder_uid, message, subject) 三元组。
+        folder_uid 格式: "folder::uid"，作为全局唯一ID写入state.json。
+        known_uids: 已处理的ID集合，跳过。
         """
-        uids = self.search_invoice_uids(since)
+        entries = self.search_invoice_uids(since)
         known = known_uids or set()
 
-        for uid in uids:
-            if uid in known:
+        for folder, uid in entries:
+            key = f"{folder}::{uid}"
+            if key in known:
                 continue
-            msg = self.fetch_message(uid)
+            msg = self.fetch_message(folder, uid)
             if msg is None:
                 continue
 
             subject = decode_subject(msg.get("Subject", ""))
             # 本地过滤：主题包含关键词
             if any(kw.lower() in subject.lower() for kw in self.keywords):
-                yield uid, msg, subject
+                yield key, msg, subject

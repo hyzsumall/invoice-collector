@@ -15,6 +15,7 @@ dependencies = [
     "click",
     "rich",
     "python-dateutil",
+    "httpx",
 ]
 
 [project.scripts]

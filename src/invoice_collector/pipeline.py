@@ -36,7 +36,7 @@ def run_pipeline(
     playwright_cfg = cfg["playwright"]
 
     # 确定时间范围
-    since = _parse_month_since(month)
+    since = _parse_month_since(month, cfg["filters"]["lookback_days"])
 
     state = StateManager()
     known_uids = state.get_processed_uids()
@@ -70,10 +70,12 @@ def run_pipeline(
                     uid, msg, subject, base_dir, playwright_cfg, dry_run, stats
                 )
                 if output_files is not None:
-                    state.mark_done(uid, subject, [str(p) for p in output_files])
+                    if not dry_run:
+                        state.mark_done(uid, subject, [str(p) for p in output_files])
                     stats["processed"] += 1
                 else:
-                    state.mark_failed(uid, subject, "处理失败")
+                    if not dry_run:
+                        state.mark_failed(uid, subject, "处理失败")
                     stats["failed"] += 1
                 progress.advance(task)
 
@@ -139,14 +141,14 @@ def _save_invoice(pdf_bytes: bytes, base_dir: Path, dry_run: bool) -> Path:
     return save_pdf(pdf_bytes, fields, category, base_dir, dry_run=dry_run)
 
 
-def _parse_month_since(month: str | None) -> datetime:
+def _parse_month_since(month: str | None, lookback_days: int = 30) -> datetime:
     """将 'YYYY-MM' 转为该月第一天的datetime，None则用config的lookback"""
     if month:
         from dateutil.parser import parse as dp
         dt = dp(f"{month}-01")
         return dt
     from datetime import timedelta
-    return datetime.now() - timedelta(days=30)
+    return datetime.now() - timedelta(days=lookback_days)
 
 
 def _print_summary(stats: dict):

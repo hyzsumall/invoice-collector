@@ -11,6 +11,8 @@ filters:
   subject_keywords:
     - "发票"
     - "fapiao"
+    - "Invoice"
+    - "电子发票"
   lookback_days: 30
 
 output:
