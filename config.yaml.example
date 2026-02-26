@@ -1,0 +1,21 @@
+email:
+  provider: qq           # 可选: qq | 163 | gmail | outlook | custom
+  username: "your@qq.com"
+  password: "your_app_password"   # 各平台授权码/应用专用密码，非登录密码
+
+  # 仅 provider: custom 时需要填写以下两项：
+  # host: imap.your-provider.com
+  # port: 993
+
+filters:
+  subject_keywords:
+    - "发票"
+    - "fapiao"
+  lookback_days: 30
+
+output:
+  base_dir: "~/Downloads/发票归档"
+
+playwright:
+  headless: true
+  timeout_ms: 30000
