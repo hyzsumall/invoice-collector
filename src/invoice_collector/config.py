@@ -58,7 +58,7 @@ def load_config(config_path: Path | None = None) -> dict:
 
     # 补全默认值
     filters = cfg.setdefault("filters", {})
-    filters.setdefault("subject_keywords", ["发票", "fapiao"])
+    filters.setdefault("subject_keywords", ["发票", "fapiao", "Invoice", "电子发票", "receipt", "invoice"])
     filters.setdefault("lookback_days", 30)
 
     output = cfg.setdefault("output", {})
