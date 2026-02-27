@@ -8,14 +8,14 @@ from .pdf_parser import InvoiceFields
 logger = logging.getLogger(__name__)
 
 
-def build_filename(fields: InvoiceFields, category: str) -> str:
+def build_filename(fields: InvoiceFields, category: str, ext: str = ".pdf") -> str:
     """
-    构建文件名: YYYYMMDD_金额_类型.pdf
+    构建文件名: YYYYMMDD_金额_类型.ext
     字段缺失时使用占位值。
     """
     date = fields.date or "UNKNOWN"
     amount = fields.amount or "0.00"
-    return f"{date}_{amount}_{category}.pdf"
+    return f"{date}_{amount}_{category}{ext}"
 
 
 def get_output_dir(base_dir: Path, date_str: str) -> Path:
@@ -30,6 +30,35 @@ def get_output_dir(base_dir: Path, date_str: str) -> Path:
     return base_dir / "未归类"
 
 
+def save_invoice_file(
+    file_bytes: bytes,
+    fields: InvoiceFields,
+    category: str,
+    base_dir: Path,
+    ext: str = ".pdf",
+    dry_run: bool = False,
+) -> Path:
+    """
+    保存发票文件到目标目录，返回最终写入路径。
+    dry_run=True 时只返回路径不写文件。
+    """
+    if not fields.parse_ok:
+        out_dir = base_dir / "未归类"
+        filename = f"unknown{ext}"
+    else:
+        out_dir = get_output_dir(base_dir, fields.date)
+        filename = build_filename(fields, category, ext)
+
+    target = _resolve_conflict(out_dir / filename)
+
+    if not dry_run:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(file_bytes)
+        logger.info(f"已保存: {target}")
+
+    return target
+
+
 def save_pdf(
     pdf_bytes: bytes,
     fields: InvoiceFields,
@@ -37,25 +66,8 @@ def save_pdf(
     base_dir: Path,
     dry_run: bool = False,
 ) -> Path:
-    """
-    保存PDF到目标目录，返回最终写入路径。
-    dry_run=True 时只返回路径不写文件。
-    """
-    if not fields.parse_ok:
-        out_dir = base_dir / "未归类"
-        filename = "unknown.pdf"
-    else:
-        out_dir = get_output_dir(base_dir, fields.date)
-        filename = build_filename(fields, category)
-
-    target = _resolve_conflict(out_dir / filename)
-
-    if not dry_run:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(pdf_bytes)
-        logger.info(f"已保存: {target}")
-
-    return target
+    """兼容旧接口"""
+    return save_invoice_file(pdf_bytes, fields, category, base_dir, ext=".pdf", dry_run=dry_run)
 
 
 def _resolve_conflict(path: Path) -> Path:
