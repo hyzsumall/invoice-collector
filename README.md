@@ -1,5 +1,7 @@
 # 发票自动归档工具 / Invoice Auto-Archiver
 
+**[English Documentation](README_EN.md)**
+
 自动从邮箱下载发票PDF/OFD附件与网页发票，智能分类重命名，按月归档到本地目录。
 
 Automatically downloads invoice PDFs/OFDs (attachments + web links) from your email, renames them intelligently, and archives by month.
