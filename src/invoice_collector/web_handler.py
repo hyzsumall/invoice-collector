@@ -19,7 +19,13 @@ _USELESS_URL_PATTERNS = re.compile(
     r"[?&]Wjgs=XML\b"
     # 各平台纯首页（域名后只有 /、#、/# 等，无发票路径）
     r"|^https?://(?:www\.)?(?:baiwang\.com|nuonuo\.com|fp\.nuonuo\.com|ntf\.nuonuo\.com"
-    r"|nst\.nuonuo\.com|baoxiao\.nuonuo\.com|newtimeai\.com)(?:[/?#][^a-zA-Z0-9]*)?$",
+    r"|nst\.nuonuo\.com|baoxiao\.nuonuo\.com|newtimeai\.com)(?:[/?#][^a-zA-Z0-9]*)?$"
+    # 诺诺扫码查验（二维码跳转页，需微信扫码，无法自动下载）
+    r"|^https?://bmjc\.nuonuo\.com/"
+    # 诺诺网导航/营销页面（非发票下载页）
+    r"|^https?://(?:www\.)?nuonuo\.com/nuonuo/web/"
+    # 诺税通平台（需登录，无法自动下载）
+    r"|^https?://ntf\.nuonuo\.com/.+",
     re.IGNORECASE,
 )
 
